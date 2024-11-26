@@ -1,5 +1,6 @@
 import os
 import environ
+from datetime import timedelta
 
 from pathlib import Path
 
@@ -31,12 +32,15 @@ DJANGO_APPS = [
 ]
 
 PROJECT_APPS = [
-
+    'apps.authentication'
 ]
 
 THIRD_PARTY_APPS = [
     'rest_framework',
-    'channels'
+    'channels',
+    'djoser',
+    "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + PROJECT_APPS + THIRD_PARTY_APPS
@@ -57,7 +61,7 @@ ROOT_URLCONF = 'core.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, "templates")],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -90,6 +94,14 @@ DATABASES = {
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
+
+
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
+]
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -133,6 +145,54 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticatedOrReadOnly"
     ],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication"
+    ]
+}
+
+AUTHENTICATION_BACKENDS = (
+    "django.contrib.auth.backends.ModelBackend",
+)
+
+AUTH_USER_MODEL = "authentication.UserAccount"
+
+SIMPLE_JWT = {
+    "AUTH_HEADER_TYPES": ("JWT",),
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=30),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=60),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
+    "SIGNING_KEY": env("SECRET_KEY"),
+}
+
+DJOSER = {
+    'LOGIN_FIELD': "email",
+    'USER_CREATE_PASSWORD_RETYPE': True,
+    "USERNAME_CHANGED_EMAIL_CONFIRMATION": True,
+    "PASSWORD_CHANGED_EMAIL_CONFIRMATION": True,
+    "SEND_CONFIRMATION_EMAIL": True,
+    "SEND_ACTIVATION_EMAIL": True,
+
+    'PASSWORD_RESET_CONFIRM_URL': 'email/password_reset_confirm/{uid}/{token}',
+    'USERNAME_RESET_CONFIRM_URL': 'email/username_reset_confirm/{uid}/{token}',
+    'ACTIVATION_URL': 'email/activate/{uid}/{token}',
+
+    'SERIALIZERS': {
+        "user_create": "apps.authentication.serializers.UserCreateSerializer",
+        "user": "apps.authentication.serializers.UserSerializer",
+        "current_user": "apps.authentication.serializers.UserSerializer",
+        "user_delete": "djoser.serializers.UserDeleteSerializer"
+    },
+
+    'TEMPLATES': {
+        "activation": "email/auth/activation.html",
+        "confirmation": "email/auth/confirmation.html",
+        "password_reset": "email/auth/password_reset.html",
+        "password_changed_confirmation": "email/auth/password_changed_confirmation.html",
+        "username_changed_confirmation": "email/auth/username_changed_confirmation.html",
+        "username_reset": "email/auth/username_reset.html",
+    }
 }
 
 CHANNEL_LAYERS = {
@@ -155,3 +215,14 @@ CACHES = {
 }
 
 CHANNELS_ALLOWED_ORIGINS = "http://localhost:3000"
+
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+if not DEBUG:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = env("EMAIL_HOST")
+    EMAIL_PORT = env("EMAIL_PORT")
+    EMAIL_HOST_USER = env("EMAIL_HOST_USER")
+    EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
+    EMAIL_USE_TLS = env("EMAIL_USE_TLS") == "True"
+    DEFAULT_FROM_EMAIL = "Uridium <no-reply@uridium.finance>"
