@@ -1,0 +1,39 @@
+services:
+  # Django App
+  authentication_backend:
+   container_name: django_authentication
+   build: .
+   command: uvicorn core.asgi:application --host 0.0.0.0 --port 8002 --reload
+   volumes:
+     - .:/app
+   ports:
+     - 8002:8002
+   depends_on:
+     - authentication_django_redis
+     - authentication_django_db
+    
+  # Redis
+  authentication_django_redis:
+   image: redis
+   container_name: authentication_django_redis
+   ports:
+    - 6379:6380
+  
+  # Database
+  authentication_django_db:
+    image: postgres
+    container_name: postgresql_authentication
+    restart: always
+    environment:
+      POSTGRES_DB: django_db
+      POSTGRES_USER: django
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - 5432:5433
+    volumes:
+      - .dbdata:/var/lib/postgresql
+    
+
+   
+    
+    
