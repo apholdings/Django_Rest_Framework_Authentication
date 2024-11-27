@@ -16,6 +16,7 @@ environ.Env.read_env()
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env("SECRET_KEY")
+VALID_API_KEYS = env.str("VALID_API_KEYS").split(",")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -32,18 +33,31 @@ DJANGO_APPS = [
 ]
 
 PROJECT_APPS = [
-    'apps.authentication'
+    'apps.authentication',
+    'apps.user_profile',
+    'apps.media',
 ]
 
 THIRD_PARTY_APPS = [
     'rest_framework',
+    'rest_framework_api',
     'channels',
     'djoser',
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
+    'ckeditor',
+    'ckeditor_uploader',
+    'axes'
 ]
 
 INSTALLED_APPS = DJANGO_APPS + PROJECT_APPS + THIRD_PARTY_APPS
+
+CKEDITOR_CONFIGS = {"default": {"toolbar": "full", "autoParagraph": False}}
+CKEDITOR_UPLOAD_PATH = "media/"
+
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = lambda request: timedelta(minutes=5)
+AXES_LOCK_OUT_AT_FAILURE = True
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -54,6 +68,13 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+
+    # AxesMiddleware should be the last middleware in the MIDDLEWARE list.
+    # It only formats user lockout messages and renders Axes lockout responses
+    # on failed user authentication attempts from login views.
+    # If you do not want Axes to override the authentication response
+    # you can skip installing the middleware and use your own views.
+    'axes.middleware.AxesMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -128,12 +149,12 @@ USE_I18N = True
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/4.2/howto/static-files/
+# # Static files (CSS, JavaScript, Images)
+# # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_LOCATION = "static"
-STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, "static")
+# STATIC_LOCATION = "static"
+# STATIC_URL = 'static/'
+# STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -151,6 +172,9 @@ REST_FRAMEWORK = {
 }
 
 AUTHENTICATION_BACKENDS = (
+    # AxesStandaloneBackend should be the first backend in the AUTHENTICATION_BACKENDS list.
+    'axes.backends.AxesStandaloneBackend',
+
     "django.contrib.auth.backends.ModelBackend",
 )
 
@@ -217,6 +241,40 @@ CACHES = {
 CHANNELS_ALLOWED_ORIGINS = "http://localhost:3000"
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+# Configuracion de Cloudfront
+AWS_CLOUDFRONT_DOMAIN=env("AWS_CLOUDFRONT_DOMAIN")
+AWS_CLOUDFRONT_KEY_ID =env.str("AWS_CLOUDFRONT_KEY_ID").strip()
+AWS_CLOUDFRONT_KEY =env.str("AWS_CLOUDFRONT_KEY", multiline=True).encode("ascii").strip()
+
+# Configuraciones de AWS
+AWS_ACCESS_KEY_ID=env("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY=env("AWS_SECRET_ACCESS_KEY")
+AWS_STORAGE_BUCKET_NAME=env("AWS_STORAGE_BUCKET_NAME")
+AWS_S3_REGION_NAME=env("AWS_S3_REGION_NAME")
+AWS_S3_CUSTOM_DOMAIN=f"{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com"
+
+# Configuración de seguridad y permisos
+AWS_QUERYSTRING_AUTH = False # Deshabilita las firmas en las URLs (archivos públicos)
+AWS_FILE_OVERWRITE = False # Evita sobrescribir archivos con el mismo nombre
+AWS_DEFAULT_ACL = None # Define el control de acceso predeterminado como público
+AWS_QUERYSTRING_EXPIRE = 5 # Tiempo de expiración de las URLs firmadas
+
+# Parámetros adicionales para los objetos de S3
+AWS_S3_OBJECT_PARAMETERS = {
+    "CacheControl": "max-age=86400" # Habilita el almacenamiento en caché por un día
+}
+
+# Configuración de archivos estáticos
+STATIC_LOCATION = "static"
+STATIC_URL = f"{AWS_S3_CUSTOM_DOMAIN}/{STATIC_LOCATION}/"
+STATICFILES_STORAGE = "core.storage_backends.StaticStorage"
+
+# Configuración de archivos de medios
+MEDIA_LOCATION = "media"
+MEDIA_URL = f"https://{AWS_CLOUDFRONT_DOMAIN}/{MEDIA_LOCATION}/"
+DEFAULT_FILE_STORAGE = "core.storage_backends.PublicMediaStorage"
+
 
 if not DEBUG:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
